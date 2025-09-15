@@ -1,0 +1,74 @@
+version: "3.9"
+
+services:
+  iteamrepositoryapi:
+    build:
+      context: .
+      dockerfile: ./IteamRepositoryAPI/Dockerfile
+    container_name: iteamrepositoryapi
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__Postgres=Host=db;Database=ItemDB;Username=postgres;Password=Noya@27189
+      - RabbitMq__ConnectionString=amqp://guest:guest@rabbitmq:5672/
+    ports:
+      - "5000:8080"
+      - "5001:443"
+
+  itemrepositoryworkerservice:
+    build:
+      context: .
+      dockerfile: ./ItemRepositoryWorkerService/Dockerfile
+    container_name: itemrepositoryworkerservice
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - ConnectionStrings__Postgres=Host=db;Database=ItemDB;Username=postgres;Password=Noya@27189
+      - RabbitMq__ConnectionString=amqp://guest:guest@rabbitmq:5672/
+
+  db:
+    image: postgres:15
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ItemDB
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Noya@27189
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"   # RabbitMQ client
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmqctl status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
